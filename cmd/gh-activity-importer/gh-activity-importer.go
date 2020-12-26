@@ -59,7 +59,10 @@ func main() {
 	}
 	app.End = end
 
-	// TODO: start.Before(end)
+	if app.Start.After(app.End) {
+		fmt.Println("start-date must before end-date")
+		os.Exit(2)
+	}
 
 	if err := app.Run(); err != nil {
 		fmt.Printf("gh-activity-importer encountered an error: %s\n", err)
