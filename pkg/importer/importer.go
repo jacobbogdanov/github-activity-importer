@@ -4,8 +4,10 @@ package importer
 
 import (
 	"fmt"
+	"log"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-git/go-git/v5"
@@ -30,23 +32,32 @@ type Importer struct {
 	// Information about the destination git repository.
 	DestRepo   string
 	DestAuthor User
+
+	// Control where the importer will log to.
+	Logger *log.Logger
 }
 
 // Run is the main entry point to run the importer application.
 func (app *Importer) Run() error {
-	source, err := git.PlainOpen(app.SourceRepo)
+	source, err := app.openRepo(app.SourceRepo)
 	if err != nil {
-		return fmt.Errorf("failed to open source repository '%s': %s", app.SourceRepo, err)
+		return fmt.Errorf("error loading source repo: %v", err)
 	}
 
-	dest, err := git.PlainOpen(app.DestRepo)
+	dest, err := app.openRepo(app.DestRepo)
 	if err != nil {
-		return fmt.Errorf("failed to open destination repository '%s': %s", app.DestRepo, err)
+		return fmt.Errorf("error loading dest repo: %v", err)
 	}
 
 	timestamps, err := app.find(source)
 	if err != nil {
 		return err
+	}
+
+	if len(timestamps) == 0 {
+		return fmt.Errorf(
+			"source repository contains zero commits from author '%s' between %s and %s",
+			app.SourceAuthor, app.Start, app.End)
 	}
 
 	// go-git has no equivalent to `git log --reverse`. See https://github.com/go-git/go-git/issues/60
@@ -56,7 +67,51 @@ func (app *Importer) Run() error {
 		}
 	}
 
+	app.Logger.Printf(
+		"successfully transferred %d commits from %s to %s\n\n"+
+			"Verify the output of the destination repository (by running something like `git log`.)\n"+
+			"If the output looks good push to remote, wait a few minutes, then check your github profile!",
+		len(timestamps), app.SourceRepo, app.DestRepo)
+
 	return nil
+}
+
+// openRepo takes either a URL or a filepath and opens the git repository for reading or writing.
+func (app *Importer) openRepo(filepathOrURL string) (*git.Repository, error) {
+	parts := strings.Split(filepathOrURL, "://")
+	if len(parts) == 1 {
+		return openLocalRepo(filepathOrURL)
+	}
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("failed to determine protocol from URL or filepath '%s': found protocol separator '://' more than once", filepathOrURL)
+	}
+	if parts[0] == "file" {
+		return openLocalRepo(parts[1])
+	}
+
+	app.Logger.Println("cloning remote repository into local folder 'dest'")
+	repo, err := git.PlainClone(
+		"dest",
+		false,
+		&git.CloneOptions{
+			URL:      filepathOrURL,
+			Progress: app.Logger.Writer(),
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to clone remote repository '%s': %v", filepathOrURL, err)
+	}
+
+	return repo, nil
+}
+
+func openLocalRepo(filepath string) (*git.Repository, error) {
+	repo, err := git.PlainOpen(filepath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open local git repository '%s': %v", filepath, err)
+	}
+
+	return repo, nil
 }
 
 func (app *Importer) find(repo *git.Repository) ([]time.Time, error) {

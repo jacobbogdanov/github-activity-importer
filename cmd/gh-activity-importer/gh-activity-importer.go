@@ -5,6 +5,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -29,6 +30,8 @@ func main() {
 	flag.StringVar(&app.DestAuthor.Email, "dest-author-email", "", "The email of the author to save the commits as.\nIf omitted this will be the same as the source-author-email.")
 
 	flag.Parse()
+
+	app.Logger = log.New(os.Stderr, "", 0)
 
 	if app.SourceAuthor.Name == "" && app.SourceAuthor.Email == "" {
 		fmt.Println("at least one of 'source-author-name' and 'source-author-email' is required")
@@ -105,7 +108,7 @@ func parseTime(value string, bound Bound) (time.Time, error) {
 	date := time.Date(year, time.Month(month), day, 24, 0, 0, 0, time.UTC)
 	if bound == upperBound {
 		return date.AddDate(0, 0, 1), nil
-}
+	}
 
 	return date, nil
 }
