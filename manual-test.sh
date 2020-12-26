@@ -13,12 +13,12 @@ pushd _test || exit
 git init src
 echo "creating dummy data..."
 
-pushd _test/src || exit
-tools/create_dummy_data.py \
+pushd src || exit
+"${THIS_DIR}/tools/create_dummy_data.py" \
     --user-name="Mr. Private" \
     --email=private@example.com \
     --include-other-users \
-    > _test/create_dummy_data.log
+    > "${THIS_DIR}/_test/create_dummy_data.log"
 popd
 
 git init dest
