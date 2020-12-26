@@ -131,13 +131,37 @@ func (app *Importer) find(repo *git.Repository) ([]time.Time, error) {
 	}
 
 	timestamps := []time.Time{}
+	all := int(0)
+	prev := int(0)
 	err = cIter.ForEach(func(c *object.Commit) error {
+		all++
+
 		if app.matchesSource(c.Author) {
 			timestamps = append(timestamps, c.Author.When)
 		}
 
+		if all%100 == 0 {
+			curr := len(timestamps)
+
+			if curr != prev {
+				fmt.Printf("x")
+			} else {
+				fmt.Printf(".")
+			}
+
+			prev = curr
+
+			// Only 40 dots or x's per line.
+			if all%(100*40) == 0 {
+				fmt.Println("")
+			}
+		}
 		return nil
 	})
+
+	if all > 100 {
+		fmt.Println("")
+	}
 
 	return timestamps, err
 }
